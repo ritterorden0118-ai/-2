@@ -46,10 +46,13 @@ class AlarmService : Service() {
             val p=PendingIntent.getBroadcast(this, code.hashCode() + alarmType.hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             return NotificationCompat.Action.Builder(0,label,p).build()
         }
-        val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val screenIntent = Intent(this, AlarmActivity::class.java)
+            .putExtra("taskId", taskId).putExtra("date", taskDate)
+            .putExtra("alarmType", alarmType).putExtra("title", title)
+        val open=PendingIntent.getActivity(this,taskId.hashCode(),screenIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val isStart = alarmType == "start"
         val primary = if (isStart) action("始める","begin") else action("今日はここまで","done")
-        return NotificationCompat.Builder(this,"yaberu_alarm").setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle(if (isStart) "やるベル｜始める時間" else "やるベル｜終了時間").setContentText(title).setContentIntent(open).setFullScreenIntent(open,true).setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX).setOngoing(true).addAction(primary).addAction(action("5分後","snooze")).addAction(action("停止","stop")).build()
+        return NotificationCompat.Builder(this,"yaberu_alarm").setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle(if (isStart) "やるベル｜始める時間" else "やるベル｜終了時間").setContentText(title).setContentIntent(open).setFullScreenIntent(open,true).setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX).setOngoing(true).addAction(primary).addAction(action("5分後","snooze")).addAction(action("音の停止","stop")).build()
     }
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
@@ -100,7 +103,10 @@ class AlarmActionReceiver : android.content.BroadcastReceiver() {
                 val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 5 * 60 * 1000, p)
             }
-            // "begin" and "stop" silence this occurrence without marking the task complete.
+            "begin", "stop" -> {
+                // 音だけを止め、タスクは完了扱いにしない。
+                AlarmScheduler.rescheduleAll(context)
+            }
         }
     }
 }

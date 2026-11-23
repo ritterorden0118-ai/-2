@@ -1,3 +1,4 @@
+
 package jp.example.yaberu
 
 import android.app.*
@@ -165,9 +166,10 @@ fun AddTaskDialog(initialTask: TodoTask? = null, onDismiss:()->Unit, onSave:(Tod
     var title by remember(initialTask?.id) { mutableStateOf(initialTask?.title ?: "") }
     var hour by remember(initialTask?.id) { mutableIntStateOf(initialTask?.hour ?: 9) }; var minute by remember(initialTask?.id) { mutableIntStateOf(initialTask?.minute ?: 0) }
     var endHour by remember(initialTask?.id) { mutableIntStateOf(initialTask?.endHour ?: 10) }; var endMinute by remember(initialTask?.id) { mutableIntStateOf(initialTask?.endMinute ?: 0) }
+    var hasEndTime by remember(initialTask?.id) { mutableStateOf(initialTask?.endHour != null && initialTask?.endMinute != null) }
     var repeat by remember(initialTask?.id) { mutableStateOf(initialTask?.repeat ?: "単発") }; var date by remember(initialTask?.id) { mutableStateOf(initialTask?.date ?: LocalDate.now().toString()) }
     var days by remember(initialTask?.id) { mutableStateOf(initialTask?.weekdays ?: setOf(1,2,3,4,5,6,7)) }
-    val endTimeValid = LocalTime.of(endHour, endMinute).isAfter(LocalTime.of(hour, minute))
+    val endTimeValid = !hasEndTime || LocalTime.of(endHour, endMinute).isAfter(LocalTime.of(hour, minute))
     AlertDialog(onDismissRequest=onDismiss,containerColor=Color.White,title={Text(if (initialTask == null) "Todoを追加" else "Todoを編集",fontWeight=FontWeight.Bold)},text={
         Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(value=title,onValueChange={title=it},label={Text("やること")},singleLine=true)
@@ -176,8 +178,14 @@ fun AddTaskDialog(initialTask: TodoTask? = null, onDismiss:()->Unit, onSave:(Tod
                 TextButton(onClick={ TimePickerDialog(context,{_,h,m->hour=h;minute=m},hour,minute,true).show() }) { Icon(Icons.Default.Alarm,null); Spacer(Modifier.width(6.dp)); Text("%02d:%02d".format(hour,minute),fontSize=20.sp) }
             }
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Text("終了",Modifier.weight(1f),color=Ink)
-                TextButton(onClick={ TimePickerDialog(context,{_,h,m->endHour=h;endMinute=m},endHour,endMinute,true).show() }) { Icon(Icons.Default.Alarm,null); Spacer(Modifier.width(6.dp)); Text("%02d:%02d".format(endHour,endMinute),fontSize=20.sp) }
+                Checkbox(checked=hasEndTime,onCheckedChange={hasEndTime=it})
+                Text("終了時刻も設定する",color=Ink)
+            }
+            if (hasEndTime) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Text("終了",Modifier.weight(1f),color=Ink)
+                    TextButton(onClick={ TimePickerDialog(context,{_,h,m->endHour=h;endMinute=m},endHour,endMinute,true).show() }) { Icon(Icons.Default.Alarm,null); Spacer(Modifier.width(6.dp)); Text("%02d:%02d".format(endHour,endMinute),fontSize=20.sp) }
+                }
             }
             Text("繰り返し",fontWeight=FontWeight.SemiBold)
             Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { listOf("単発","毎日","毎週","毎月").forEach { FilterChip(repeat==it,{repeat=it},label={Text(it,fontSize=12.sp)}) } }
@@ -187,12 +195,12 @@ fun AddTaskDialog(initialTask: TodoTask? = null, onDismiss:()->Unit, onSave:(Tod
             if(repeat=="毎週") {
                 Row(horizontalArrangement=Arrangement.spacedBy(2.dp)) { listOf("月","火","水","木","金","土","日").forEachIndexed { i,d -> FilterChip(days.contains(i+1),{days=if(days.contains(i+1)) days-(i+1) else days+(i+1)},label={Text(d,fontSize=11.sp)},modifier=Modifier.weight(1f)) } }
             }
-            if (!endTimeValid) Text("終了時刻は開始時刻より後に設定してください。",fontSize=12.sp,color=Color(0xFFB36B36))
+            if (hasEndTime && !endTimeValid) Text("終了時刻は開始時刻より後に設定してください。",fontSize=12.sp,color=Color(0xFFB36B36))
             Text("開始時刻に「始める」、終了時刻に「今日はここまで」のアラームが鳴ります。",fontSize=12.sp,color=Color.Gray)
         }
     },confirmButton={TextButton(onClick={
         if(title.isNotBlank() && endTimeValid && runCatching{LocalDate.parse(date)}.isSuccess && (repeat!="毎週" || days.isNotEmpty())) {
-            onSave(TodoTask(id=initialTask?.id ?: java.util.UUID.randomUUID().toString(), title=title.trim(),hour=hour,minute=minute,repeat=repeat,date=date,weekdays=days,completedDates=initialTask?.completedDates ?: emptySet(),enabled=initialTask?.enabled ?: true,endHour=endHour,endMinute=endMinute))
+            onSave(TodoTask(id=initialTask?.id ?: java.util.UUID.randomUUID().toString(), title=title.trim(),hour=hour,minute=minute,repeat=repeat,date=date,weekdays=days,completedDates=initialTask?.completedDates ?: emptySet(),enabled=initialTask?.enabled ?: true,endHour=if(hasEndTime) endHour else null,endMinute=if(hasEndTime) endMinute else null))
         }
     }) { Text(if (initialTask == null) "追加" else "保存") }},dismissButton={TextButton(onClick=onDismiss){Text("キャンセル")}})
 }

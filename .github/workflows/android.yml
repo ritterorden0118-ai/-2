@@ -3,7 +3,7 @@ name: Repair and build Yaberu
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2.1]
   workflow_dispatch:
 
 permissions:
@@ -24,11 +24,11 @@ jobs:
           mkdir -p app/src/main/res/values
 
           for f in AlarmPauseStore.kt AlarmReceiver.kt AlarmScheduler.kt AlarmService.kt AlarmSoundStore.kt MainActivity.kt Task.kt TaskStore.kt; do
-            mv "$f" app/src/main/java/jp/example/yaberu/
+            if [ -f "$f" ]; then mv "$f" app/src/main/java/jp/example/yaberu/; fi
           done
 
-          mv AndroidManifest.xml app/src/main/
-          mv styles.xml app/src/main/res/values/
+          if [ -f AndroidManifest.xml ]; then mv AndroidManifest.xml app/src/main/; fi
+          if [ -f styles.xml ]; then mv styles.xml app/src/main/res/values/; fi
 
           cat > app/build.gradle.kts <<'EOF'
           plugins {
@@ -45,8 +45,8 @@ jobs:
                   applicationId = "jp.example.yaberu"
                   minSdk = 26
                   targetSdk = 35
-                  versionCode = 3
-                  versionName = "0.3.0"
+                  versionCode = 4
+                  versionName = "0.4.0"
               }
 
               buildFeatures { compose = true }
@@ -74,8 +74,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Restore Android app module structure"
-          git push
+          if ! git diff --cached --quiet; then
+            git commit -m "Restore Android app module structure"
+            git push
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
