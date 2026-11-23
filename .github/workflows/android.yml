@@ -1,0 +1,98 @@
+
+name: Repair and build Yaberu
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore Android project structure
+        run: |
+          mkdir -p app/src/main/java/jp/example/yaberu
+          mkdir -p app/src/main/res/values
+
+          for f in AlarmPauseStore.kt AlarmReceiver.kt AlarmScheduler.kt AlarmService.kt AlarmSoundStore.kt MainActivity.kt Task.kt TaskStore.kt; do
+            mv "$f" app/src/main/java/jp/example/yaberu/
+          done
+
+          mv AndroidManifest.xml app/src/main/
+          mv styles.xml app/src/main/res/values/
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+              id("org.jetbrains.kotlin.plugin.compose")
+          }
+
+          android {
+              namespace = "jp.example.yaberu"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "jp.example.yaberu"
+                  minSdk = 26
+                  targetSdk = 35
+                  versionCode = 3
+                  versionName = "0.3.0"
+              }
+
+              buildFeatures { compose = true }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.15.0")
+              implementation("androidx.activity:activity-compose:1.10.1")
+              implementation(platform("androidx.compose:compose-bom:2025.01.01"))
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-graphics")
+              implementation("androidx.compose.ui:ui-tooling-preview")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+              debugImplementation("androidx.compose.ui:ui-tooling")
+          }
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore Android app module structure"
+          git push
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: yaberu-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
